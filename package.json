@@ -1,0 +1,17 @@
+{
+  "name": "telegram-ai-agent",
+  "version": "1.0.0",
+  "description": "Telegram Business AI Agent for Vitrina AI",
+  "private": true,
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0",
+    "@supabase/supabase-js": "^2.39.0"
+  },
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  }
+}
