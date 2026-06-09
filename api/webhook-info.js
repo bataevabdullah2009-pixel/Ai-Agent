@@ -25,6 +25,10 @@ module.exports = async function handler(req, res) {
       last_error_message: data.result?.last_error_message || null
     });
   } catch (err) {
+    console.error('webhook-info error:', {
+      message: err.message,
+      stack: err.stack
+    });
     res.status(500).json({ ok: false, error: err.message });
   }
 };

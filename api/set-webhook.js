@@ -49,6 +49,11 @@ module.exports = async function handler(req, res) {
       webhook_url: webhookTarget
     });
   } catch (err) {
+    console.error('set-webhook error:', {
+      message: err.message,
+      stack: err.stack,
+      webhookTarget
+    });
     res.status(500).json({
       ok: false,
       error: err.message

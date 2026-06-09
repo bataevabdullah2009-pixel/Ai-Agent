@@ -14,14 +14,28 @@ async function sendMessage(chatId, text, options = {}) {
     ...options
   };
 
-  const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  try {
+    const res = await fetch(`${TELEGRAM_API}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
 
-  if (!res.ok) {
-    console.error('sendMessage error:', await res.text());
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error('sendMessage HTTP error:', {
+        chatId,
+        status: res.status,
+        statusText: res.statusText,
+        body: errorBody
+      });
+    }
+  } catch (err) {
+    console.error('sendMessage request failed:', {
+      chatId,
+      message: err.message,
+      stack: err.stack
+    });
   }
 }
 
@@ -39,7 +53,12 @@ function extractLeadData(aiReply) {
     const parsed = JSON.parse(match[0]);
     if (parsed.action === 'create_lead') return parsed;
     return null;
-  } catch {
+  } catch (err) {
+    console.error('extractLeadData parse error:', {
+      message: err.message,
+      stack: err.stack,
+      aiReplyPreview: String(aiReply).slice(0, 200)
+    });
     return null;
   }
 }
@@ -85,7 +104,21 @@ async function handleMessage(message) {
 
   console.log(`[${chatId}] ${from?.first_name}: ${text}`);
 
-  let aiReply = await askAI(chatId, text);
+  let aiReply;
+  try {
+    aiReply = await askAI(chatId, text);
+  } catch (err) {
+    console.error('handleMessage askAI error:', {
+      chatId,
+      message: err.message,
+      stack: err.stack
+    });
+    await sendMessage(
+      chatId,
+      'Сейчас не удаётся обработать ваш запрос. Попробуйте через пару минут или отправьте /start.'
+    );
+    return;
+  }
 
   const leadData = extractLeadData(aiReply);
 
@@ -142,9 +175,18 @@ async function handleMessage(message) {
 }
 
 async function handleUpdate(update) {
-  const message = update.message || update.edited_message;
-  if (message) {
-    await handleMessage(message);
+  try {
+    const message = update.message || update.edited_message;
+    if (message) {
+      await handleMessage(message);
+    }
+  } catch (err) {
+    console.error('handleUpdate error:', {
+      updateId: update?.update_id,
+      message: err.message,
+      stack: err.stack
+    });
+    throw err;
   }
 }
 

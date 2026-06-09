@@ -14,7 +14,11 @@ module.exports = async function handler(req, res) {
     await handleUpdate(update);
     res.status(200).json({ ok: true });
   } catch (err) {
-    console.error('Webhook error:', err);
+    console.error('Webhook error:', {
+      message: err.message,
+      stack: err.stack,
+      bodyType: typeof req.body
+    });
     res.status(200).json({ ok: true });
   }
 };
