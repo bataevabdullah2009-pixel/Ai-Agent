@@ -45,6 +45,27 @@ async function sendAdminNotification(text) {
   await sendMessage(adminChatId, text);
 }
 
+const FORBIDDEN_VALUES = new Set([
+  'имя', 'телефон', 'город', 'не указано', 'unknown', 'undefined', 'null', '-', ''
+]);
+
+function isPlaceholder(value) {
+  if (!value) return true;
+  const normalized = String(value).trim().toLowerCase();
+  return FORBIDDEN_VALUES.has(normalized);
+}
+
+function isValidLeadData(data) {
+  if (!data) return false;
+  
+  if (isPlaceholder(data.name)) return false;
+  if (isPlaceholder(data.phone)) return false;
+  if (isPlaceholder(data.business_name) && isPlaceholder(data.business_type)) return false;
+  if (isPlaceholder(data.notes)) return false;
+  
+  return true;
+}
+
 function extractLeadData(aiReply) {
   try {
     const match = aiReply.match(/\{[\s\S]*"action"\s*:\s*"create_lead"[\s\S]*\}/);
@@ -136,6 +157,21 @@ async function handleMessage(message) {
   if (leadData) {
     const leadText = leadData.notes || text;
 
+    const hasBusinessInfo = !isPlaceholder(leadData.business_name) || !isPlaceholder(leadData.business_type);
+    const hasTaskInfo = !isPlaceholder(leadText);
+    const hasName = !isPlaceholder(leadData.name);
+    const hasPhone = !isPlaceholder(leadData.phone);
+
+    if (!hasName || !hasPhone) {
+      await sendMessage(chatId, 'Понял задачу. Чтобы передать заявку менеджеру, напишите, пожалуйста, ваше имя, город и номер телефона.');
+      return;
+    }
+
+    if (!hasBusinessInfo || !hasTaskInfo) {
+      await sendMessage(chatId, 'Для оформления заявки мне нужно узнать ваш бизнес и задачу. Расскажите, пожалуйста, подробнее.');
+      return;
+    }
+
     const lead = await createLead({
       chat_id: chatId,
       name: leadData.name,
@@ -147,20 +183,35 @@ async function handleMessage(message) {
     });
 
     if (lead) {
-      const clientName = from?.first_name || 'Клиент';
-      await sendMessage(chatId, `Спасибо, ${leadData.name || clientName}! Ваша заявка принята. Менеджер свяжется с вами в ближайшее время.`);
+      await sendMessage(chatId, `Спасибо, ${leadData.name}! Заявка принята. Менеджер свяжется с вами в ближайшее время.`);
 
-      await sendAdminNotification(
-        `<b>Новый лид!</b>\n\n` +
-        `<b>Имя:</b> ${leadData.name || '—'}\n` +
-        `<b>Бизнес:</b> ${leadData.business_name || '—'}\n` +
-        `<b>Тип:</b> ${leadData.business_type || '—'}\n` +
-        `<b>Город:</b> ${leadData.city || '—'}\n` +
-        `<b>Телефон:</b> ${leadData.phone || '—'}\n` +
-        `<b>Заметки:</b> ${leadText}\n\n` +
-        `<b>Chat ID:</b> ${chatId}\n` +
-        `<b>Username:</b> @${from?.username || '—'}`
-      );
+      const adminChatId = process.env.ADMIN_CHAT_ID;
+      if (adminChatId && String(adminChatId) !== String(chatId)) {
+        await sendAdminNotification(
+          `Новый лид!\n` +
+          `Имя: ${leadData.name}\n` +
+          `Бизнес: ${leadData.business_name || '—'}\n` +
+          `Тип: ${leadData.business_type || '—'}\n` +
+          `Город: ${leadData.city || '—'}\n` +
+          `Телефон: ${leadData.phone}\n` +
+          `Заметки: ${leadText}\n` +
+          `Chat ID: ${chatId}\n` +
+          `Username: @${from?.username || '—'}`
+        );
+      } else if (adminChatId && String(adminChatId) === String(chatId)) {
+        await sendAdminNotification(
+          `[ТЕСТ] Уведомление админу\n` +
+          `Новый лид!\n` +
+          `Имя: ${leadData.name}\n` +
+          `Бизнес: ${leadData.business_name || '—'}\n` +
+          `Тип: ${leadData.business_type || '—'}\n` +
+          `Город: ${leadData.city || '—'}\n` +
+          `Телефон: ${leadData.phone}\n` +
+          `Заметки: ${leadText}\n` +
+          `Chat ID: ${chatId}\n` +
+          `Username: @${from?.username || '—'}`
+        );
+      }
     } else {
       await sendMessage(chatId, 'Произошла ошибка при сохранении заявки. Попробуйте позже или напишите напрямую владельцу.');
     }
@@ -172,12 +223,12 @@ async function handleMessage(message) {
     await sendMessage(chatId, aiReply);
 
     await sendAdminNotification(
-      `<b>Клиент нуждается в помощи</b>\n\n` +
-      `<b>Имя:</b> ${from?.first_name || '—'}\n` +
-      `<b>Username:</b> @${from?.username || '—'}\n` +
-      `<b>Chat ID:</b> ${chatId}\n` +
-      `<b>Сообщение:</b> ${text}\n` +
-      `<b>Ответ AI:</b> ${aiReply}`
+      `Клиент нуждается в помощи\n\n` +
+      `Имя: ${from?.first_name || '—'}\n` +
+      `Username: @${from?.username || '—'}\n` +
+      `Chat ID: ${chatId}\n` +
+      `Сообщение: ${text}\n` +
+      `Ответ AI: ${aiReply}`
     );
     return;
   }
