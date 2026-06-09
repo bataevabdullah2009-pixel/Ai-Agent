@@ -64,14 +64,25 @@ function extractLeadData(aiReply) {
 }
 
 function isUncertainResponse(text) {
-  const phrases = [
+  const lower = text.toLowerCase();
+  
+  const priceKeywords = ['цена', 'стоимость', 'подключение', 'функц', 'срок', 'запуск', 'базов'];
+  const isPriceRelated = priceKeywords.some(kw => lower.includes(kw));
+  
+  const uncertainPhrases = [
     'передам',
     'владельцу',
     'лично',
     'ближайшее время',
     'owner',
+    'не уверен',
+    'не знаю',
+    'базе знаний нет',
   ];
-  return phrases.some(p => text.toLowerCase().includes(p));
+  
+  const hasUncertainPhrase = uncertainPhrases.some(p => lower.includes(p));
+  
+  return hasUncertainPhrase && !isPriceRelated;
 }
 
 async function handleMessage(message) {
