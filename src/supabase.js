@@ -8,7 +8,7 @@ const supabase = createClient(
 async function createLead({ chat_id, name, business_name, business_type, city, phone, notes }) {
   try {
     const { data, error } = await supabase
-      .from('leads')
+      .from('ai_agent_leads')
       .insert({
         chat_id,
         name: name || null,
